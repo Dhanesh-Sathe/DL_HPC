@@ -1,0 +1,111 @@
+%%writefile cuda_programs.cu
+
+#include <stdio.h>
+
+// ---------------- VECTOR ADDITION ----------------
+__global__ void vectorAdd(int *A, int *B, int *C, int N) {
+    int i = threadIdx.x;
+
+    if (i < N) {
+        C[i] = A[i] + B[i];
+    }
+}
+
+// ---------------- MATRIX MULTIPLICATION ----------------
+__global__ void matrixMultiply(int *A, int *B, int *C, int N) {
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+
+    if (row < N && col < N) {
+        int sum = 0;
+
+        for (int k = 0; k < N; k++) {
+            sum += A[row * N + k] * B[k * N + col];
+        }
+
+        C[row * N + col] = sum;
+    }
+}
+
+int main() {
+
+    // ================= VECTOR ADDITION =================
+    int N1 = 5;
+    int size1 = N1 * sizeof(int);
+
+    int h_A[5] = {1, 2, 3, 4, 5};
+    int h_B[5] = {10, 20, 30, 40, 50};
+    int h_C[5];
+
+    int *d_A, *d_B, *d_C;
+
+    cudaMalloc((void**)&d_A, size1);
+    cudaMalloc((void**)&d_B, size1);
+    cudaMalloc((void**)&d_C, size1);
+
+    cudaMemcpy(d_A, h_A, size1, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, h_B, size1, cudaMemcpyHostToDevice);
+
+    vectorAdd<<<1, N1>>>(d_A, d_B, d_C, N1);
+
+    cudaMemcpy(h_C, d_C, size1, cudaMemcpyDeviceToHost);
+
+    printf("Vector Addition Result:\n");
+    for (int i = 0; i < N1; i++) {
+        printf("%d ", h_C[i]);
+    }
+    printf("\n\n");
+
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+
+    // ================= MATRIX MULTIPLICATION =================
+    int N2 = 2;
+    int size2 = N2 * N2 * sizeof(int);
+
+    int h_M1[2][2] = {
+        {1, 2},
+        {3, 4}
+    };
+
+    int h_M2[2][2] = {
+        {5, 6},
+        {7, 8}
+    };
+
+    int h_Result[2][2];
+
+    int *d_M1, *d_M2, *d_Result;
+
+    cudaMalloc((void**)&d_M1, size2);
+    cudaMalloc((void**)&d_M2, size2);
+    cudaMalloc((void**)&d_Result, size2);
+
+    cudaMemcpy(d_M1, h_M1, size2, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_M2, h_M2, size2, cudaMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(N2, N2);
+
+    matrixMultiply<<<1, threadsPerBlock>>>(d_M1, d_M2, d_Result, N2);
+
+    cudaMemcpy(h_Result, d_Result, size2, cudaMemcpyDeviceToHost);
+
+    printf("Matrix Multiplication Result:\n");
+    for (int i = 0; i < N2; i++) {
+        for (int j = 0; j < N2; j++) {
+            printf("%d ", h_Result[i][j]);
+        }
+        printf("\n");
+    }
+
+    cudaFree(d_M1);
+    cudaFree(d_M2);
+    cudaFree(d_Result);
+
+    return 0;
+}
+
+// commands
+// nvcc cuda_programs.cu -o cuda_programs
+// ./cuda_programs
